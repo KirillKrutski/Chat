@@ -1,29 +1,39 @@
 package org.example;
 
+import javax.swing.*;
 import java.io.*;
 import java.net.*;
 import java.util.*;
 
 public class Server {
+    private static JTextArea serverMessages;
     // Карта для хранения логинов клиентов и их потоков вывода
     private static Map<String, PrintWriter> clientMap = new HashMap<>();
 
     public static void main(String[] args) {
+        JFrame frame = new JFrame("Server");
+        serverMessages = new JTextArea(20, 40);
+        serverMessages.setEditable(false);
+        JScrollPane scroll = new JScrollPane(serverMessages);
+        frame.add(scroll);
+        frame.pack();
+        frame.setVisible(true);
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
         int port = 8080;  // Порт сервера
 
         try (ServerSocket serverSocket = new ServerSocket(port)) {
-            System.out.println("Server start by port: " + port);
+            appendMessage("Server start by port: " + port);
 
             // Бесконечный цикл для обработки подключений клиентов
             while (true) {
                 Socket clientSocket = serverSocket.accept();  // Принятие клиента
-                System.out.println("Client connected: " + clientSocket.getInetAddress());
-
+                appendMessage("Client connected: " + clientSocket.getInetAddress());
                 // Создаем новый поток для клиента
                 new ClientHandler(clientSocket).start();
             }
         } catch (IOException e) {
-            System.out.println("Error server work: " + e.getMessage());
+            appendMessage("Error server work: " + e.getMessage());
         }
     }
 
@@ -40,13 +50,9 @@ public class Server {
 
         public void run() {
             try {
-                // Поток вывода для клиента
-                out = new PrintWriter(socket.getOutputStream(), true);
-                // Поток для чтения сообщений клиента
-                in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-
-                // Запрос логина у клиента
-                out.println("Enter your login:");
+                out = new PrintWriter(socket.getOutputStream(), true); // Поток вывода для клиента
+                in = new BufferedReader(new InputStreamReader(socket.getInputStream())); // Поток для чтения сообщений клиента
+                out.println("Enter your login:"); // Запрос логина у клиента
                 clientLogin = in.readLine();
 
                 // Проверка уникальности логина
@@ -59,13 +65,11 @@ public class Server {
                     clientMap.put(clientLogin, out);
                 }
 
-                out.println("Welcome to Server, " + clientLogin);
+                appendMessage("User has been connected to chat, " + clientLogin);
 
                 String message;
                 // Чтение сообщений клиента
                 while ((message = in.readLine()) != null) {
-                    System.out.println(clientLogin + ": " + message);
-
                     // Проверка, адресовано ли сообщение конкретному клиенту
                     if (message.startsWith("@")) {
                         int separatorIndex = message.indexOf(",");
@@ -93,23 +97,28 @@ public class Server {
                                 writer.println(clientLogin + ": " + message);
                             }
                         }
+                        appendMessage(clientLogin + ": " + message);
                     }
                 }
             } catch (IOException e) {
-                System.out.println("Error client working: " + e.getMessage());
+                appendMessage("Error client working: " + e.getMessage());
             } finally {
                 // Удаление клиента из карты при отключении
                 if (clientLogin != null) {
                     synchronized (clientMap) {
                         clientMap.remove(clientLogin);
+                        appendMessage("User " + clientLogin + " has been disconnected.");
                     }
                 }
                 try {
                     socket.close();
                 } catch (IOException e) {
-                    System.out.println("Error of client's socket: " + e.getMessage());
+                    appendMessage("Error of client's socket: " + e.getMessage());
                 }
             }
         }
+    }
+    public static void appendMessage(String text) {
+        serverMessages.append(text + "\n");
     }
 }
